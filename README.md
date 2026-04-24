@@ -1,7 +1,7 @@
 # Patient-Shared Health Document via SMART Health Links
 
 > **Status:** Draft
-> **Version:** 0.6.0
+> **Version:** 0.7.0
 
 ## Introduction
 
@@ -9,17 +9,15 @@ This implementation guide defines a constrained profile of SMART Health Links (S
 
 ### Requirements
 
-> 1. Patient app creates a SHLink pointing to any FHIR resources and a DocumentReference to a "Patient-Shared PDF". This PDF should include:
+> 1. Patient app creates a SHLink pointing to any US Core FHIR resources, and may include:
 >    - All available USCDI data or a summary of elements specified by IPS, as filtered/selected by the patient. (Discrete data shared in the PDF should also be offered as FHIR discrete data.)
 >    - Any additional information the patient wants to share.
 >
 > 2. The provider can scan the SHLink QR, resolve + decrypt the data, and store this information.
->    - The EHR must be able to store at least one of the Patient-Shared PDF or any FHIR Resources and present them to users.
->    - The EHR may also display, ingest, and use other content from the SHLink.
+>    - The EHR must be able to store the FHIR Resources and make them usable to the EHR's users
+>    - The EHR may also display, ingest, and use other content from the SHLink
 >
 > 3. At no point in this flow does a patient need to sign into an EHR Portal.
->
-> — *Kill the Clipboard Working Group, updated 2/18/2026 (originally 1/30/2025)*
 
 ### Scope
 
@@ -154,7 +152,7 @@ The decrypted payload is a FHIR Bundle conforming to this profile.
 ```
 Bundle (type: collection)
 ├── Patient (1..1)
-├── DocumentReference (1..1) - PatientSharedDocumentReference profile
+├── DocumentReference (0..*) - PatientSharedDocumentReference profile
 │   └── content.attachment - embedded PDF (base64)
 └── [Additional FHIR resources]* (0..*)
 ```
@@ -309,7 +307,6 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 - Include `exp` (expiration) in SHLink payload
 - Serve encrypted payload without requiring authentication
 - Return encrypted FHIR Bundle conforming to PatientSharedBundle profile
-- Include a DocumentReference with embedded PDF conforming to PatientSharedDocumentReference
 - Accept `recipient` query parameter on retrieval endpoint
 - Audit each SHLink access with recipient and timestamp
 
@@ -323,6 +320,7 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 **MAY:**
 - Include discrete FHIR resources (medications, conditions, observations, etc.) in addition to the PDF
 - Include an App Attestation extension (see [App Attestation](#app-attestation-optional))
+- Include a DocumentReference with embedded PDF conforming to PatientSharedDocumentReference
 
 ### Provider EHR (Receiver)
 
