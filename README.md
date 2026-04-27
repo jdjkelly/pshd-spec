@@ -1,21 +1,25 @@
 # Patient-Shared Health Document via SMART Health Links
 
-> **Status:** Draft
-> **Version:** 0.7.0
+> **Status:** Draft for July 2026
+> **Version:** 0.8.0
 
 ## Introduction
 
-This implementation guide defines a constrained profile of SMART Health Links (SHLinks) for patient-to-provider sharing of health data at the point of care. A patient presents a QR code; the provider's EHR scans it, downloads an encrypted FHIR Bundle, and stores it.
+This implementation guide defines a constrained profile of SMART Health Links (SHLinks) for patient-to-provider sharing of health data at the point of care. A patient presents a QR code; the provider's EHR scans it, downloads an encrypted FHIR Bundle, and persists all received US Core FHIR content so it remains associated with the patient's chart.
 
 ### Requirements
 
-> 1. Patient app creates a SHLink pointing to any US Core FHIR resources, and may include:
->    - All available USCDI data or a summary of elements specified by IPS, as filtered/selected by the patient. (Discrete data shared in the PDF should also be offered as FHIR discrete data.)
->    - Any additional information the patient wants to share.
+> 1. Patient app creates a SHLink pointing to a FHIR Bundle that may include:
+>    - Patient-selected FHIR resources conforming to US Core profiles.
+>    - Patient-authored PDF documents represented as PatientSharedDocumentReference resources. This US Core DocumentReference profile carries the PDF in `content.attachment`.
+>    - Other patient-shared information represented as US Core-conformant FHIR resources.
 >
-> 2. The provider can scan the SHLink QR, resolve + decrypt the data, and store this information.
->    - The EHR must be able to store the FHIR Resources and make them usable to the EHR's users
->    - The EHR may also display, ingest, and use other content from the SHLink
+> Patient-authored PDF documents SHOULD focus on information from the patient's perspective: their own words, story, priorities, concerns, goals, care experiences, corrections, and context. They SHOULD NOT simply repeat clinical facts already available as discrete FHIR resources. When clinical facts can be represented discretely, the sender SHOULD include the corresponding US Core FHIR resources instead of repeating those facts only in narrative.
+>
+> 2. The provider can scan the SHLink QR, resolve + decrypt the data, and persist all received US Core FHIR content.
+>    - The EHR SHALL persist all received FHIR resources conforming to US Core profiles, including PatientSharedDocumentReference resources, so they are associated with the patient's chart and available later to authorized users.
+>    - This is a functional persistence requirement. It does not require the EHR to store each received resource in the data layer that backs the EHR's FHIR API, or to mirror received resources through that API.
+>    - The EHR MAY satisfy the persistence requirement through product-specific storage approaches, including filing structured data, storing a chart-associated copy of the received content, rendering content into a document or note, preserving the original Bundle, or another approach that maintains access and provenance.
 >
 > 3. At no point in this flow does a patient need to sign into an EHR Portal.
 
@@ -24,7 +28,7 @@ This implementation guide defines a constrained profile of SMART Health Links (S
 This IG defines:
 
 1. SHLink payload constraints for patient-shared health data
-2. A FHIR Bundle profile containing the patient summary, optional DocumentReference with PDF, and discrete FHIR resources
+2. A FHIR Bundle profile for US Core-conformant patient-shared content, including optional PatientSharedDocumentReference resources and optional additional discrete FHIR resources
 3. Requirements for patient apps (senders) and EHRs (receivers)
 4. An optional App Attestation extension for provenance signaling
 
@@ -32,9 +36,9 @@ This IG defines:
 
 | Actor | Role |
 |-------|------|
-| Patient App | Generates SHLink QR containing encrypted FHIR Bundle (discrete resources and/or PDF) |
+| Patient App | Generates SHLink QR containing encrypted FHIR Bundle with US Core-conformant FHIR resources, including optional PatientSharedDocumentReference resources |
 | Patient | Presents QR to provider |
-| Provider EHR | Scans QR, downloads and stores patient-shared data (FHIR resources and/or PDF) |
+| Provider EHR | Scans QR, downloads, and persists patient-shared US Core FHIR resources, including PatientSharedDocumentReference resources |
 
 ---
 
@@ -157,7 +161,7 @@ Bundle (type: collection)
 └── [Additional FHIR resources]* (0..*)
 ```
 
-The Bundle MUST contain a DocumentReference with embedded PDF. Discrete FHIR resources (e.g., Conditions, Medications, Observations) are optional but SHOULD be included when available.
+The Bundle SHALL contain a Patient resource and at least one additional patient-shared content entry. Content entries MAY include PatientSharedDocumentReference resources, additional FHIR resources conforming to US Core profiles, or both. Discrete FHIR resources SHOULD be included when available for clinical facts represented in patient-authored PDFs.
 
 ### Constraints
 
@@ -165,9 +169,9 @@ The Bundle MUST contain a DocumentReference with embedded PDF. Discrete FHIR res
 |---------|-------------|------------|
 | `type` | 1..1 | Fixed: `collection` |
 | `timestamp` | 1..1 | When bundle was assembled |
-| `entry` | 1..* | Minimum: Patient and a DocumentReference; discrete FHIR resources are optional |
+| `entry` | 2..* | Minimum: Patient and at least one patient-shared content entry |
 | `entry:patient` | 1..1 | Patient resource |
-| `entry:documentReference` | 1..1 | Conforms to PatientSharedDocumentReference |
+| `entry:documentReference` | 0..* | Conforms to PatientSharedDocumentReference when a patient-authored PDF document is included |
 
 > **Note:** Resources in this Bundle SHOULD NOT include `meta.profile`. Receivers SHALL NOT require `meta.profile` to be present.
 
@@ -259,7 +263,7 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 | `content.attachment.contentType` | 1..1 | `application/pdf` |
 | `content.attachment.data` | 1..1 | Base64-encoded PDF |
 
-> **Note:** This profile applies only when a PDF is included. The PatientSharedBundle does not require a DocumentReference; apps MAY share only discrete FHIR resources.
+> **Note:** This profile applies only when a patient-authored PDF document is included. The PatientSharedBundle does not require a DocumentReference; apps MAY share only discrete FHIR resources.
 
 ---
 
@@ -307,6 +311,7 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 - Include `exp` (expiration) in SHLink payload
 - Serve encrypted payload without requiring authentication
 - Return encrypted FHIR Bundle conforming to PatientSharedBundle profile
+- Represent any patient-authored PDF document as a PatientSharedDocumentReference resource
 - Accept `recipient` query parameter on retrieval endpoint
 - Audit each SHLink access with recipient and timestamp
 
@@ -318,9 +323,9 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 - Include `meta.security` with `PATAST` on DocumentReference (when present)
 
 **MAY:**
-- Include discrete FHIR resources (medications, conditions, observations, etc.) in addition to the PDF
+- Include additional FHIR resources conforming to US Core profiles
 - Include an App Attestation extension (see [App Attestation](#app-attestation-optional))
-- Include a DocumentReference with embedded PDF conforming to PatientSharedDocumentReference
+- Include a PatientSharedDocumentReference resource
 
 ### Provider EHR (Receiver)
 
@@ -329,7 +334,8 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 - Supply `recipient` query parameter identifying requesting organization
 - Decrypt payload using key from SHLink
 - Parse PatientSharedBundle
-- Store and present the Patient-Shared PDF to users
+- Persist all received FHIR resources conforming to US Core profiles, including PatientSharedDocumentReference resources, so they are associated with the patient's chart and available later to authorized users
+- Present persisted patient-shared FHIR content to authorized clinical users
 - Indicate patient-shared provenance in clinical UI
 
 **SHALL NOT:**
@@ -343,10 +349,11 @@ This profile aligns with the US Core [Writing Clinical Notes](https://build.fhir
 - Verify App Attestation when present and display provenance indicator to clinician
 
 **MAY:**
-- Store and display the PDF from the DocumentReference
 - Parse and display discrete FHIR resources from Bundle
 - Ingest discrete data into structured EHR fields
-- Support both PDF and FHIR resource consumption
+- Support consumption of PatientSharedDocumentReference resources and other FHIR resources from the Bundle
+
+The receiver persistence requirement is functional: all received US Core FHIR content SHALL remain associated with the patient's chart and available for later access by authorized users. This requirement does not require the EHR to store each received resource in the data layer that backs the EHR's FHIR API, or to mirror received resources through that API. EHRs MAY satisfy this requirement through product-specific storage approaches, including filing structured data, storing a chart-associated copy of the received content, rendering content into a document or note, preserving the original Bundle, or another approach that maintains access and provenance.
 
 ---
 
@@ -458,6 +465,26 @@ Apps that publish a JWKS for App Attestation SHOULD:
 Patient Apps SHALL maintain audit logs of SHLink access including:
 - Timestamp
 - Recipient organization (from query parameter)
+
+
+:::info
+### Guidance: Retrieving SHLink Payloads
+
+SHLink payload URLs should be treated as untrusted external input. This IG does not define a required CMS hosting-domain allowlist; receivers are expected to secure retrieval rather than depend on pre-coordinated hosting domains.
+
+Receivers SHOULD retrieve payloads through a hardened, isolated retrieval service rather than from core EHR application servers. That service SHOULD:
+
+- allow only HTTPS retrieval
+- block loopback, private, link-local, multicast, and internal network targets, consistent with [OWASP SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+- validate DNS results and protect against DNS rebinding
+- re-validate every redirect target before following it
+- enforce short timeouts and response type checks
+- have no access to internal EHR services, databases, cloud metadata endpoints, or application credentials
+- treat decrypted FHIR and embedded PDFs as untrusted patient-supplied content, with validation and sandboxed handling where appropriate, consistent with [OWASP file handling guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+
+This approach aligns with [NIST Zero Trust Architecture](https://csrc.nist.gov/pubs/sp/800/207/final): protect resources with least-privilege, isolated components rather than relying on network location or a static perimeter.
+:::
+
 
 ---
 
