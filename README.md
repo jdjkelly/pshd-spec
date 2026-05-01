@@ -1,25 +1,23 @@
-# Patient-Shared Health Document via SMART Health Links
+# Patient-Shared Health Documents via SMART Health Links
 
 > **Status:** Draft for July 2026
-> **Version:** 0.8.0
+> **Version:** 0.9.0
 
 ## Introduction
 
-This implementation guide defines a constrained profile of SMART Health Links (SHLinks) for patient-to-provider sharing of health data at the point of care. A patient presents a QR code; the provider's EHR scans it, downloads an encrypted FHIR Bundle, and persists all received US Core FHIR content so it remains associated with the patient's chart.
+This implementation guide defines a constrained profile of SMART Health Links (SHLinks) for patient-to-provider sharing of health data at the point of care. A patient presents a QR code; the provider's EHR scans it, downloads an encrypted FHIR Bundle containing USCDI data classes and elements, and persists the content in a manner associated with the patient's chart.
 
 ### Requirements
 
 > 1. Patient app creates a SHLink pointing to a FHIR Bundle that may include:
->    - Patient-selected FHIR resources conforming to US Core profiles.
->    - Patient-authored PDF documents represented as PatientSharedDocumentReference resources. This US Core DocumentReference profile carries the PDF in `content.attachment`.
->    - Other patient-shared information represented as US Core-conformant FHIR resources.
+>     - a) Patient-shared FHIR resources conforming to the profiles in the following Implementation Guides: US Core, CARIN BlueButton, and CARIN Digital Insurance Card.
+>     - b) Patient-authored PDF documents represented as PatientSharedDocumentReference resources. This US Core DocumentReference profile carries the PDF in `content.attachment`.
+>     - c) Patient-authored PDF documents SHOULD focus on information from the patient's perspective: their own words, story, priorities, concerns, goals, care experiences, corrections, and context. They SHOULD NOT simply repeat clinical facts already available as discrete FHIR resources. When clinical facts can be represented discretely, the sender SHOULD include the corresponding US Core FHIR resources instead of repeating those facts only in narrative.
 >
-> Patient-authored PDF documents SHOULD focus on information from the patient's perspective: their own words, story, priorities, concerns, goals, care experiences, corrections, and context. They SHOULD NOT simply repeat clinical facts already available as discrete FHIR resources. When clinical facts can be represented discretely, the sender SHOULD include the corresponding US Core FHIR resources instead of repeating those facts only in narrative.
->
-> 2. The provider can scan the SHLink QR, resolve + decrypt the data, and persist all received US Core FHIR content.
->    - The EHR SHALL persist all received FHIR resources conforming to US Core profiles, including PatientSharedDocumentReference resources, so they are associated with the patient's chart and available later to authorized users.
->    - This is a functional persistence requirement. It does not require the EHR to store each received resource in the data layer that backs the EHR's FHIR API, or to mirror received resources through that API.
->    - The EHR MAY satisfy the persistence requirement through product-specific storage approaches, including filing structured data, storing a chart-associated copy of the received content, rendering content into a document or note, preserving the original Bundle, or another approach that maintains access and provenance.
+> 2. The provider can scan the SHLink QR, resolve + decrypt the data, and persist all received patient-shared health data.
+>     - a) The EHR SHALL persist all received FHIR resources conforming to the profiles in the Implementation Guides listed in (1)(a) and (1)(b), so they are associated with the patient's chart and available later to authorized users.
+>     - b) This is a functional persistence requirement. It does not require the EHR to store each received resource in the data layer that backs the EHR's FHIR API, or to mirror received resources through that API, nor even to store them natively in FHIR.
+>     - c) The EHR MAY satisfy the persistence requirement through product-specific storage approaches, including filing structured data, storing a chart-associated copy of the received content, rendering content into a document or note, preserving the original Bundle, or another approach that maintains access and provenance.
 >
 > 3. At no point in this flow does a patient need to sign into an EHR Portal.
 
@@ -483,6 +481,12 @@ Receivers SHOULD retrieve payloads through a hardened, isolated retrieval servic
 - treat decrypted FHIR and embedded PDFs as untrusted patient-supplied content, with validation and sandboxed handling where appropriate, consistent with [OWASP file handling guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 
 This approach aligns with [NIST Zero Trust Architecture](https://csrc.nist.gov/pubs/sp/800/207/final): protect resources with least-privilege, isolated components rather than relying on network location or a static perimeter.
+:::
+
+:::info
+### Guidance: USCDI
+
+
 :::
 
 
